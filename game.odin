@@ -49,7 +49,7 @@ gameData :: struct{
     fuel : fuelData,
     asteroids : [dynamic] asteroidData,
     max_asteroids : i32,
-    is_paused : bool,
+    draw_local_space : bool,
 }
 
 UpdateGame :: proc(game_data : ^gameData){
@@ -68,9 +68,8 @@ UpdateGame :: proc(game_data : ^gameData){
     if len(asteroids) < int(max_asteroids) {
         SpawnNewAsteroid(&asteroids)
     }
-    if !is_paused {
-        UpdateAsteroids(&asteroids)
-    }
+
+    UpdateAsteroids(&asteroids)
     DestoryAsteroidInEdge(game_data)
 }
 
@@ -95,12 +94,9 @@ UpdateGameState :: proc(game_data : ^gameData){
 
     player.direction = {math.sin_f32(rotation), -math.cos_f32(rotation)}
 
-    if !is_paused {
-        player.position += player.direction * f32(speed) * rl.GetFrameTime()
-    }
+    player.position += player.direction * f32(speed) * rl.GetFrameTime()
 
     speed = i32(100 + (math.floor((rl.GetTime()-start_time)/5) * 20))
-    // speed = 100
 
     if(rl.IsKeyDown(.LEFT)){
         rotation -= rl.PI * rl.GetFrameTime()
@@ -110,9 +106,9 @@ UpdateGameState :: proc(game_data : ^gameData){
         rotation += rl.PI * rl.GetFrameTime()
     }
 
-    // if rl.IsKeyPressed(.SPACE) {
-    //     is_paused = !is_paused
-    // }
+    if rl.IsKeyPressed(.D) {
+        draw_local_space = !draw_local_space
+    }
 
     if(!fuel.is_spawn){
         fuel.position = {f32(rl.GetRandomValue(FUEL_WIDTH, 640-20)), f32(rl.GetRandomValue(FUEL_HEIGHT, 480-40))}
@@ -185,7 +181,6 @@ CheckCollision :: proc(game_data : ^gameData){
             mat_asteroid_to_player := GetMatrixAsteroidToPlayer(player, asteroid)
             if GjkCheckPolygon(player_polygon[:], ASTEROID_POINTS[asteroid.type][0:len(ASTEROID_POINTS[asteroid.type])], mat_asteroid_to_player) {
                 game_state = .GameOver
-                // is_paused = true
                 break
             }
         }
@@ -250,35 +245,42 @@ DrawGameState :: proc(game_data : ^gameData){
     DrawFuel(fuel)
     DrawAsteroids(game_data)
 
-    // rl.rlPushMatrix()
-    // rl.rlTranslatef(GAME_WIDTH/2, GAME_HEIGHT/2, 0)
-    // //DEBUG
-
-    // for point, i in player_polygon {
-    //     next_i := (i + 1) % len(player_polygon)
-    //     next_point := player_polygon[next_i]
-
-    //     rl.DrawLineV(point, next_point, rl.GREEN)
-    // }
-
-    // for asteroid in asteroids { 
-    //     //check bounding box
-    //     if(rl.Vector2DistanceSqrt(player.position, asteroid.position) < 100*100){
-    //         mat_asteroid_to_player := GetMatrixAsteroidToPlayer(player, asteroid)
-    //         asteroid_polygon : []vec2 = ASTEROID_POINTS[asteroid.type]
-    //         for point, i in asteroid_polygon {
-    //             trans_point := (mat_asteroid_to_player * rl.Vector4{point.x, point.y, 0, 1}).xy
-    //             next_i := (i + 1) % len(asteroid_polygon)
-    //             next_point := asteroid_polygon[next_i]
-    //             trans_next_point := (mat_asteroid_to_player * rl.Vector4{next_point.x, next_point.y, 0, 1}).xy
-
-    //             rl.DrawLineV(trans_point, trans_next_point, rl.PURPLE)
-    //         }
-    //     }
-    // }
-    // rl.rlPopMatrix()
+    if draw_local_space {
+        DrawLocalSpace(game_data)
+    }
     
     rl.EndMode2D()
+}
+
+DrawLocalSpace :: proc(game_data : ^gameData){
+    using game_data
+
+    rl.rlPushMatrix()
+    rl.rlTranslatef(GAME_WIDTH/2, GAME_HEIGHT/2, 0)
+
+    for point, i in player_polygon {
+        next_i := (i + 1) % len(player_polygon)
+        next_point := player_polygon[next_i]
+
+        rl.DrawLineV(point, next_point, rl.GREEN)
+    }
+
+    for asteroid in asteroids { 
+        //check bounding box
+        if(rl.Vector2DistanceSqrt(player.position, asteroid.position) < 100*100){
+            mat_asteroid_to_player := GetMatrixAsteroidToPlayer(player, asteroid)
+            asteroid_polygon : []vec2 = ASTEROID_POINTS[asteroid.type]
+            for point, i in asteroid_polygon {
+                trans_point := (mat_asteroid_to_player * rl.Vector4{point.x, point.y, 0, 1}).xy
+                next_i := (i + 1) % len(asteroid_polygon)
+                next_point := asteroid_polygon[next_i]
+                trans_next_point := (mat_asteroid_to_player * rl.Vector4{next_point.x, next_point.y, 0, 1}).xy
+
+                rl.DrawLineV(trans_point, trans_next_point, rl.PURPLE)
+            }
+        }
+    }
+    rl.rlPopMatrix()
 }
 
 DrawGameOverState :: proc(game_data : ^gameData){
