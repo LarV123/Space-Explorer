@@ -1,0 +1,4 @@
+build/debug.exe
+build/debug.pdb
+ols.json
+.vscode/settings.json
